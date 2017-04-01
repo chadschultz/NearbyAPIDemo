@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center_horizontal">
+
+    <Button
+        android:id="@+id/earshot_mode_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        style="?android:attr/borderlessButtonStyle"/>
+
+    <Button
+        android:id="@+id/regular_mode_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        style="?android:attr/borderlessButtonStyle"/>
+
+    <Button
+        android:id="@+id/blank_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/blank_button"
+        style="?android:attr/borderlessButtonStyle"/>
+
+    <Button
+        android:id="@+id/intro_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/intro_button"
+        style="?android:attr/borderlessButtonStyle"/>
+
+    <Button
+        android:id="@+id/distance_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/distance_button"
+        style="?android:attr/borderlessButtonStyle"/>
+
+    <Button
+        android:id="@+id/poll_results_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/distance_poll_button"
+        style="?android:attr/borderlessButtonStyle"/>
+
+    <Button
+        android:id="@+id/camera_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/camera_button"
+        style="?android:attr/borderlessButtonStyle"/>
+
+    <Button
+        android:id="@+id/contact_info_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/contact_info_button"
+        style="?android:attr/borderlessButtonStyle"/>
+
+    <Button
+        android:id="@+id/sign_out_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/sign_out_button"
+        style="?android:attr/borderlessButtonStyle"/>
+
+</LinearLayout>

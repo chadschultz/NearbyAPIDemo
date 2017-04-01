@@ -1,0 +1,55 @@
+<resources>
+    <string name="app_name">Nearby API Demo</string>
+
+    <!-- TODO: find a better way to do this -->
+    <string name="presenter_email">chadschultz@gmail.com</string>
+
+    <string name="ask_question_button">Ask a question</string>
+    <string name="answer_questions_button">Questions: %1$d</string>
+    <string name="user_valid">Presenter access granted</string>
+    <string name="user_invalid">Presenter access denied</string>
+
+    <string name="connection_status_waiting">Waiting for presenter…</string>
+    <string name="connection_status_earshot">Connected in earshot mode! PLEASE STAND UP</string>
+    <string name="connection_status_regular">Connected! PLEASE STAND UP</string>
+    <string name="nothing_to_see_here">Please return attention to the presenter. We will come back here shortly.</string>
+    <string name="raw_distance">Distance readings:\nMeters from left beacon: %1$.2f\nMeters from right beacon: %2$.2f</string>
+    <string name="calculated_distance_error">Error! Those distances cannot both be right.</string>
+    <string name="calculated_distance">Calculated position:\nMeters back from speaking area: %1$.2f\nMeters to the %2$s of center: %3$.2f</string>
+    <string name="left_side">left</string>
+    <string name="right_side">right</string>
+
+    <string name="accuracy_question">How accurate was this reading?</string>
+    <string name="very_accurate">Very accurate</string>
+    <string name="somewhat_accurate">Somewhat accurate</string>
+    <string name="somewhat_inaccurate">Somewhat inaccurate</string>
+    <string name="very_inaccurate">Very inaccurate</string>
+
+    <string name="accuracy_results">Accuracy poll results:</string>
+    <string name="accuracy_results_row">\n%1$s: %2$d (%3$.0f)</string>
+
+    <string name="contact">Thank you for your attention!\n\nChad Schultz\nchad@spothero.com\nhttps://github.com/chadschultz\nhttps://twitter.com/thechadschultz</string>
+
+    <string name="ask_question_instructions">Publish your question below. Only the presenter will see it. Several times during the presentation, the presenter will answer questions. There may not be time for all questions. If you provide a name, the presenter may use it when answering your question.</string>
+    <string name="name_label">Your name</string>
+    <string name="question_label">Your question</string>
+    <string name="unpublish_button">Unpublish</string>
+    <string name="publish_button">Publish</string>
+    <string name="update_button">Update</string>
+
+    <string name="question_row">%1$s asks: %2$s</string>
+    <string name="delete_question_title">Delete Question?</string>
+
+    <string name="connect_button">%1$s: %2$s</string>
+    <string name="connection_mode_earshot">Earshot</string>
+    <string name="connection_mode_regular">Regular</string>
+    <string name="connection_state_connected">Connected</string>
+    <string name="connection_state_disconnected">Disconnected</string>
+    <string name="blank_button">Blank</string>
+    <string name="intro_button">Intro</string>
+    <string name="distance_button">Distance</string>
+    <string name="distance_poll_button">Distance Poll Results</string>
+    <string name="camera_button">Camera</string>
+    <string name="contact_info_button">Contact Info</string>
+    <string name="sign_out_button">Sign Out</string>
+</resources>
