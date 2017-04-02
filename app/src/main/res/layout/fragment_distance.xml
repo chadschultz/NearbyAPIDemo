@@ -3,7 +3,8 @@
               android:layout_width="match_parent"
               android:layout_height="match_parent"
               android:orientation="vertical"
-              android:gravity="center_vertical">
+              android:gravity="center_vertical"
+              android:padding="16dp">
 
     <ProgressBar
         android:id="@+id/progressBar"
@@ -15,7 +16,7 @@
         android:id="@+id/raw_distance_textview"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textSize="16sp"
+        android:textSize="18sp"
         android:visibility="gone"/>
 
     <TextView
@@ -23,7 +24,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:textSize="16sp"
+        android:textSize="18sp"
         android:textStyle="bold"
         android:visibility="gone"/>
 
@@ -32,7 +33,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/accuracy_question"
-        android:textSize="16sp"
+        android:textSize="18sp"
         android:visibility="gone"/>
 
     <Button
@@ -67,7 +68,7 @@
         android:id="@+id/accuracy_results_textview"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textSize="16sp"
+        android:textSize="18sp"
         android:visibility="gone"/>
 
 </LinearLayout>

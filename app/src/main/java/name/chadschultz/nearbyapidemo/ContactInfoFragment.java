@@ -15,10 +15,14 @@ public class ContactInfoFragment extends Fragment {
     TextView connectTextView;
     ImageView standUpImageView;
 
+    public static ContactInfoFragment newInstance() {
+        return new ContactInfoFragment();
+    }
+
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_connect, container, false);
+        return inflater.inflate(R.layout.fragment_contact_info, container, false);
     }
 
     @Override

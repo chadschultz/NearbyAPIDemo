@@ -86,6 +86,7 @@ public class ControlFragment extends Fragment {
                 controlListener.onDistance();
             }
         });
+        //TODO: remove the poll results option?
         pollResultsButton = (Button) view.findViewById(R.id.poll_results_button);
         pollResultsButton.setOnClickListener(new OnClickListener() {
             @Override

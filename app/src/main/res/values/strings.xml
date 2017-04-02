@@ -10,8 +10,8 @@
     <string name="user_invalid">Presenter access denied</string>
 
     <string name="connection_status_waiting">Waiting for presenter…</string>
-    <string name="connection_status_earshot">Connected in earshot mode! PLEASE STAND UP</string>
-    <string name="connection_status_regular">Connected! PLEASE STAND UP</string>
+    <string name="connection_status_earshot">Connected in earshot mode!\nPLEASE STAND UP</string>
+    <string name="connection_status_regular">Connected!\nPLEASE STAND UP</string>
     <string name="nothing_to_see_here">Please return attention to the presenter. We will come back here shortly.</string>
     <string name="raw_distance">Distance readings:\nMeters from left beacon: %1$.2f\nMeters from right beacon: %2$.2f</string>
     <string name="calculated_distance_error">Error! Those distances cannot both be right.</string>
@@ -26,7 +26,7 @@
     <string name="very_inaccurate">Very inaccurate</string>
 
     <string name="accuracy_results">Accuracy poll results:</string>
-    <string name="accuracy_results_row">\n%1$s: %2$d (%3$.0f)</string>
+    <string name="accuracy_results_row">\n%1$s: %2$d (%3$.2f%%)</string>
 
     <string name="contact">Thank you for your attention!\n\nChad Schultz\nchad@spothero.com\nhttps://github.com/chadschultz\nhttps://twitter.com/thechadschultz</string>
 

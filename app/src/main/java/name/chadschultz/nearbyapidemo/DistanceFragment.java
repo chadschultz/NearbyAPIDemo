@@ -2,6 +2,7 @@ package name.chadschultz.nearbyapidemo;
 
 import android.content.Context;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.view.LayoutInflater;
@@ -12,11 +13,13 @@ import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import com.google.android.gms.nearby.messages.Distance;
+
 
 public class DistanceFragment extends Fragment {
 
     //Beacons must be physically located exactly this far apart
-    private final static Double METERS_BETWEEN_BEACONS = 4.0;
+    private final static Double METERS_BETWEEN_BEACONS = 1.3; //4.0 m = 10 feet
 
     AccuracyPollListener accuracyPollListener;
 
@@ -30,6 +33,10 @@ public class DistanceFragment extends Fragment {
     Button veryInaccurateButton;
     TextView accuracyResultsTextView;
 
+    public static DistanceFragment newInstance() {
+        return new DistanceFragment();
+    }
+
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
@@ -39,7 +46,7 @@ public class DistanceFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_connect, container, false);
+        return inflater.inflate(R.layout.fragment_distance, container, false);
     }
 
     @Override
@@ -79,10 +86,14 @@ public class DistanceFragment extends Fragment {
             }
         });
         accuracyResultsTextView = (TextView) view.findViewById(R.id.accuracy_results_textview);
+
+
+        //TODO: temp - CHEAT
+        updateDistances(new MyDistance(), new MyDistance());
     }
 
     //should only be called after both distances have been reported at least once
-    public void updateDistances(double leftBeaconToPhone, double rightBeaconToPhone) {
+    public void updateDistances(Distance leftBeaconToPhone, Distance rightBeaconToPhone) {
         progressBar.setVisibility(View.GONE);
         rawDistanceTextView.setVisibility(View.VISIBLE);
         calculatedDistanceTextView.setVisibility(View.VISIBLE);
@@ -92,18 +103,18 @@ public class DistanceFragment extends Fragment {
         somewhatInaccurateButton.setVisibility(View.VISIBLE);
         veryInaccurateButton.setVisibility(View.VISIBLE);
 
-        rawDistanceTextView.setText(getString(R.string.raw_distance, leftBeaconToPhone, rightBeaconToPhone));
+        rawDistanceTextView.setText(getString(R.string.raw_distance, leftBeaconToPhone.getMeters(), rightBeaconToPhone.getMeters()));
 
-        TriangulatedDistance triangulatedDistance = new TriangulatedDistance(METERS_BETWEEN_BEACONS, leftBeaconToPhone, rightBeaconToPhone);
+        TriangulatedDistance triangulatedDistance = new TriangulatedDistance(METERS_BETWEEN_BEACONS, leftBeaconToPhone.getMeters(), rightBeaconToPhone.getMeters());
 
         if (triangulatedDistance.error) {
             calculatedDistanceTextView.setText(R.string.calculated_distance_error);
         } else {
             String side;
             double absoluteHorizontalDistance;
-            if (triangulatedDistance.horizontalDistance > 0) {
+            if (triangulatedDistance.horizontalDistance < 0) {
                 side = getString(R.string.left_side);
-                absoluteHorizontalDistance = triangulatedDistance.horizontalDistance;
+                absoluteHorizontalDistance = Math.abs(triangulatedDistance.horizontalDistance);
             } else {
                 side = getString(R.string.right_side);
                 absoluteHorizontalDistance = Math.abs(triangulatedDistance.horizontalDistance);
@@ -126,10 +137,10 @@ public class DistanceFragment extends Fragment {
         accuracyResultsTextView.setVisibility(View.VISIBLE);
 
         StringBuilder sb = new StringBuilder(getString(R.string.accuracy_question));
-        sb.append(getString(R.string.accuracy_results_row, getString(R.string.very_accurate), veryAccurateCount, veryAccuratePercentage));
-        sb.append(getString(R.string.accuracy_results_row, getString(R.string.very_accurate), somewhatAccurateCount, somewhatAccuratePercentage));
-        sb.append(getString(R.string.accuracy_results_row, getString(R.string.very_accurate), somewhatInaccurateCount, somewhatInaccuratePercentage));
-        sb.append(getString(R.string.accuracy_results_row, getString(R.string.very_accurate), veryInaccurateCount, veryInaccuratePercentage));
+        sb.append(getString(R.string.accuracy_results_row, getString(R.string.very_accurate), veryAccurateCount, veryAccuratePercentage * 100));
+        sb.append(getString(R.string.accuracy_results_row, getString(R.string.very_accurate), somewhatAccurateCount, somewhatAccuratePercentage * 100));
+        sb.append(getString(R.string.accuracy_results_row, getString(R.string.very_accurate), somewhatInaccurateCount, somewhatInaccuratePercentage * 100));
+        sb.append(getString(R.string.accuracy_results_row, getString(R.string.very_accurate), veryInaccurateCount, veryInaccuratePercentage * 100));
         accuracyResultsTextView.setText(sb.toString());
     }
 
@@ -154,13 +165,15 @@ public class DistanceFragment extends Fragment {
             double halfPerimeter = (distanceBetweenBeacons + leftBeaconToPhone + rightBeaconToPhone) / 2;
             //Heron's formula
             double area = Math.sqrt(halfPerimeter * (halfPerimeter - distanceBetweenBeacons) * (halfPerimeter - leftBeaconToPhone) * (halfPerimeter - rightBeaconToPhone));
-            double height = distanceBetweenBeacons / (2 * area);
+            //Refactor common formula for area of triangle to solve for height
+            double height = (2 * area) / distanceBetweenBeacons;
             verticalDistance = height;
 
             //Pythagorean theorem
             double horizontalDistanceFromLeftBeacon = Math.sqrt(Math.pow(leftBeaconToPhone, 2) - Math.pow(height, 2));
             double centerPoint = distanceBetweenBeacons / 2;
-            horizontalDistance = centerPoint - horizontalDistanceFromLeftBeacon;
+            //Negative: left of center. Positive: right of center
+            horizontalDistance = -1 * (centerPoint - horizontalDistanceFromLeftBeacon);
         }
     }
 
@@ -177,4 +190,32 @@ public class DistanceFragment extends Fragment {
                 sideB + sideC > sideA &&
                 sideC + sideA > sideB);
     }
+}
+
+//TODO: temp
+class MyDistance implements Distance {
+    @Override
+    public int getAccuracy() {
+        return Accuracy.LOW;
+    }
+
+    @Override
+    public double getMeters() {
+        return 1.4;
+    }
+
+    @Override
+    public int compareTo(@NonNull Distance distance) {
+        return 0;
+    }
+}
+
+interface AccuracyPollListener {
+    void onVeryAccurateClicked();
+
+    void onSomewhatAccurateClicked();
+
+    void onSomewhatInaccurateClicked();
+
+    void onVeryInaccurateClicked();
 }

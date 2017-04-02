@@ -10,6 +10,10 @@ import android.view.ViewGroup;
 
 public class BlankFragment extends Fragment {
 
+    public static BlankFragment newInstance() {
+        return new BlankFragment();
+    }
+
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {

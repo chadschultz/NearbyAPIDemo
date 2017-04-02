@@ -15,6 +15,10 @@ public class CameraFragment extends Fragment {
     ProgressBar progressBar;
     ImageView cameraImageView;
 
+    public static CameraFragment newInstance() {
+        return new CameraFragment();
+    }
+
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
