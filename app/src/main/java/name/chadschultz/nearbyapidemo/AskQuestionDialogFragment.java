@@ -17,10 +17,12 @@ import android.widget.EditText;
 public class AskQuestionDialogFragment extends DialogFragment {
 
     private static final String KEY_QUESTION = "question";
+    private static final String KEY_NAME = "name";
 
     QuestionListener questionListener;
 
     String question;
+    String name;
 
     TextInputLayout nameTextInputLayout;
     EditText nameEditText;
@@ -29,10 +31,14 @@ public class AskQuestionDialogFragment extends DialogFragment {
     Button unpublishButton;
     Button publishButton;
 
-    public AskQuestionDialogFragment newInstance(String question) {
+    public static AskQuestionDialogFragment newInstance(Question question) {
         AskQuestionDialogFragment fragment = new AskQuestionDialogFragment();
         Bundle args = new Bundle();
-        args.putString(KEY_QUESTION, question);
+        if (question != null) {
+            args.putString(KEY_QUESTION, question.getQuestion());
+            args.putString(KEY_NAME, question.getName());
+        }
+        fragment.setArguments(args);
         return fragment;
     }
 
@@ -47,13 +53,16 @@ public class AskQuestionDialogFragment extends DialogFragment {
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
 
         question = getArguments().getString(KEY_QUESTION);
+        name = getArguments().getString(KEY_NAME);
 
         View view = inflater.inflate(R.layout.fragment_ask_question, container, false);
 
         nameTextInputLayout = (TextInputLayout) view.findViewById(R.id.name_textinputlayout);
         nameEditText = (EditText) view.findViewById(R.id.name_edittext);
+        nameEditText.setText(name);
         questionTextInputLayout = (TextInputLayout) view.findViewById(R.id.question_textinputlayout);
         questionEditText = (EditText) view.findViewById(R.id.question_edittext);
+        questionEditText.setText(question);
         unpublishButton = (Button) view.findViewById(R.id.unpublish_button);
         unpublishButton.setOnClickListener(new OnClickListener() {
             @Override
@@ -91,7 +100,10 @@ public class AskQuestionDialogFragment extends DialogFragment {
     public void publishQuestion() {
         String name = nameEditText.getText().toString();
         question = questionEditText.getText().toString();
-        questionListener.onPublishQuestion(name, question);
+        if (!TextUtils.isEmpty(question)) {
+            questionListener.onPublishQuestion(name, question);
+            updateButtons(question);
+        }
     }
 }
 

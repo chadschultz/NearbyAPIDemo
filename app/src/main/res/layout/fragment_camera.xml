@@ -16,4 +16,13 @@
         android:layout_height="match_parent"
         android:visibility="gone"/>
 
+    <TextView
+        android:id="@+id/error_textview"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:textSize="20sp"
+        android:text="@string/error_no_connection"
+        android:visibility="gone"/>
+
 </RelativeLayout>

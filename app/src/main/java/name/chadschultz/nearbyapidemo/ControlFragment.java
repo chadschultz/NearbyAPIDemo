@@ -9,9 +9,14 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
+
+import java.util.Locale;
 
 
 public class ControlFragment extends Fragment {
+
+    private static final String KEY_DISTANCE_BETWEEN_BEACONS = "distanceBetweenBeacons";
 
     private ControlListener controlListener;
 
@@ -22,14 +27,21 @@ public class ControlFragment extends Fragment {
     private Button regularModeButton;
     private Button blankButton;
     private Button introButton;
+    private EditText updateDistanceEditText;
+    private Button updateDistanceButton;
     private Button distanceButton;
     private Button pollResultsButton;
     private Button cameraButton;
     private Button contactInfoButton;
     private Button signOutButton;
 
-    public static ControlFragment newInstance() {
+    private double distanceBetweenBeacons;
+
+    public static ControlFragment newInstance(double distanceBetweenBeacons) {
         ControlFragment fragment = new ControlFragment();
+        Bundle args = new Bundle();
+        args.putDouble(KEY_DISTANCE_BETWEEN_BEACONS, distanceBetweenBeacons);
+        fragment.setArguments(args);
         return fragment;
     }
 
@@ -79,6 +91,16 @@ public class ControlFragment extends Fragment {
                 controlListener.onIntro();
             }
         });
+        updateDistanceEditText = (EditText) view.findViewById(R.id.update_distance_edittext);
+        updateDistanceBetweenBeacons(getArguments().getDouble(KEY_DISTANCE_BETWEEN_BEACONS));
+        updateDistanceButton = (Button) view.findViewById(R.id.update_distance_button);
+        updateDistanceButton.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                distanceBetweenBeacons = Double.valueOf(updateDistanceEditText.getText().toString());
+                controlListener.onUpdateDistance(distanceBetweenBeacons);
+            }
+        });
         distanceButton = (Button) view.findViewById(R.id.distance_button);
         distanceButton.setOnClickListener(new OnClickListener() {
             @Override
@@ -98,7 +120,7 @@ public class ControlFragment extends Fragment {
         cameraButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
-                controlListener.onCamera();
+                onCameraButtonClicked();
             }
         });
         contactInfoButton = (Button) view.findViewById(R.id.contact_info_button);
@@ -115,6 +137,12 @@ public class ControlFragment extends Fragment {
                 controlListener.onSignOut();
             }
         });
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putDouble(KEY_DISTANCE_BETWEEN_BEACONS, distanceBetweenBeacons);
     }
 
     public void toggleEarshotMode() {
@@ -180,6 +208,17 @@ public class ControlFragment extends Fragment {
         updateEarshot();
         controlListener.onDisconnectBoth();
     }
+
+    public void updateDistanceBetweenBeacons(double distanceBetweenBeacons) {
+        this.distanceBetweenBeacons = distanceBetweenBeacons;
+        updateDistanceEditText.setText(String.format(Locale.US, "%.2f", distanceBetweenBeacons));
+    }
+
+    private void onCameraButtonClicked() {
+        controlListener.onCamera();
+    }
+
+
 }
 
 interface ControlListener {
@@ -190,6 +229,7 @@ interface ControlListener {
     void onDisconnectBoth();
     void onBlank();
     void onIntro();
+    void onUpdateDistance(double distanceBetweenBeacons);
     void onDistance();
     void onPollResults();
     void onCamera();

@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">Nearby API Demo</string>
+    <string name="service_id">name.chadschultz.nearbyapidemo</string>
 
     <!-- TODO: find a better way to do this -->
     <string name="presenter_email">chadschultz@gmail.com</string>
@@ -8,6 +9,7 @@
     <string name="answer_questions_button">Questions: %1$d</string>
     <string name="user_valid">Presenter access granted</string>
     <string name="user_invalid">Presenter access denied</string>
+    <string name="sign_in_failed">Sign in failed</string>
 
     <string name="connection_status_waiting">Waiting for presenter…</string>
     <string name="connection_status_earshot">Connected in earshot mode!\nPLEASE STAND UP</string>
@@ -28,6 +30,8 @@
     <string name="accuracy_results">Accuracy poll results:</string>
     <string name="accuracy_results_row">\n%1$s: %2$d (%3$.2f%%)</string>
 
+    <string name="error_no_connection">Wi-Fi connection required</string>
+
     <string name="contact">Thank you for your attention!\n\nChad Schultz\nchad@spothero.com\nhttps://github.com/chadschultz\nhttps://twitter.com/thechadschultz</string>
 
     <string name="ask_question_instructions">Publish your question below. Only the presenter will see it. Several times during the presentation, the presenter will answer questions. There may not be time for all questions. If you provide a name, the presenter may use it when answering your question.</string>
@@ -47,6 +51,7 @@
     <string name="connection_state_disconnected">Disconnected</string>
     <string name="blank_button">Blank</string>
     <string name="intro_button">Intro</string>
+    <string name="update_distance_button">Update Distance</string>
     <string name="distance_button">Distance</string>
     <string name="distance_poll_button">Distance Poll Results</string>
     <string name="camera_button">Camera</string>

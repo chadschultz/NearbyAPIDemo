@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -18,8 +19,9 @@ import com.google.android.gms.nearby.messages.Distance;
 
 public class DistanceFragment extends Fragment {
 
-    //Beacons must be physically located exactly this far apart
-    private final static Double METERS_BETWEEN_BEACONS = 1.3; //4.0 m = 10 feet
+    private static final String TAG = MainActivity.TAG;
+
+    private static final String KEY_DISTANCE_BETWEEN_BEACONS = "distanceBetweenBeacons";
 
     AccuracyPollListener accuracyPollListener;
 
@@ -33,8 +35,15 @@ public class DistanceFragment extends Fragment {
     Button veryInaccurateButton;
     TextView accuracyResultsTextView;
 
-    public static DistanceFragment newInstance() {
-        return new DistanceFragment();
+    double distanceBetweenBeacons;
+
+    public static DistanceFragment newInstance(double distanceBetweenBeacons) {
+        Log.d(TAG, "DistanceFragment.newInstance(" + distanceBetweenBeacons + ")");
+        DistanceFragment fragment = new DistanceFragment();
+        Bundle args = new Bundle();
+        args.putDouble(KEY_DISTANCE_BETWEEN_BEACONS, distanceBetweenBeacons);
+        fragment.setArguments(args);
+        return fragment;
     }
 
     @Override
@@ -86,10 +95,12 @@ public class DistanceFragment extends Fragment {
             }
         });
         accuracyResultsTextView = (TextView) view.findViewById(R.id.accuracy_results_textview);
+    }
 
-
-        //TODO: temp - CHEAT
-        updateDistances(new MyDistance(), new MyDistance());
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putDouble(KEY_DISTANCE_BETWEEN_BEACONS, distanceBetweenBeacons);
     }
 
     //should only be called after both distances have been reported at least once
@@ -105,7 +116,7 @@ public class DistanceFragment extends Fragment {
 
         rawDistanceTextView.setText(getString(R.string.raw_distance, leftBeaconToPhone.getMeters(), rightBeaconToPhone.getMeters()));
 
-        TriangulatedDistance triangulatedDistance = new TriangulatedDistance(METERS_BETWEEN_BEACONS, leftBeaconToPhone.getMeters(), rightBeaconToPhone.getMeters());
+        TriangulatedDistance triangulatedDistance = new TriangulatedDistance(distanceBetweenBeacons, leftBeaconToPhone.getMeters(), rightBeaconToPhone.getMeters());
 
         if (triangulatedDistance.error) {
             calculatedDistanceTextView.setText(R.string.calculated_distance_error);
@@ -142,6 +153,11 @@ public class DistanceFragment extends Fragment {
         sb.append(getString(R.string.accuracy_results_row, getString(R.string.very_accurate), somewhatInaccurateCount, somewhatInaccuratePercentage * 100));
         sb.append(getString(R.string.accuracy_results_row, getString(R.string.very_accurate), veryInaccurateCount, veryInaccuratePercentage * 100));
         accuracyResultsTextView.setText(sb.toString());
+    }
+
+    public void updateDistanceBetweenBeacons(double distanceBetweenBeacons) {
+        Log.d(TAG, "distanceBetweenBeacons is now: " + distanceBetweenBeacons);
+        this.distanceBetweenBeacons = distanceBetweenBeacons;
     }
 
     private class TriangulatedDistance {

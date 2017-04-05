@@ -13,6 +13,9 @@
         <meta-data
             android:name="com.google.android.nearby.messages.API_KEY"
             android:value="AIzaSyAV4_xdGT29diq0Ycnd3mNZTFWaal4sc50" />
+        <!-- Required for Nearby Connections API -->
+        <meta-data android:name="com.google.android.gms.nearby.connection.SERVICE_ID"
+                   android:value="@string/service_id" />
 
         <activity android:name=".MainActivity"
                   android:screenOrientation="portrait">

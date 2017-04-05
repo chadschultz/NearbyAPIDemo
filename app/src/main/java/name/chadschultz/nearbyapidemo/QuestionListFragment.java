@@ -27,7 +27,7 @@ public class QuestionListFragment extends Fragment {
     private ListView listView;
     private QuestionAdapter adapter;
 
-    public QuestionListFragment newInstance() {
+    public static QuestionListFragment newInstance() {
         QuestionListFragment fragment = new QuestionListFragment();
         return fragment;
     }
@@ -72,6 +72,7 @@ public class QuestionListFragment extends Fragment {
     public void setQuestions(List<Question> questions) {
         adapter.setQuestions(questions);
         listView.setAdapter(adapter);
+        //TODO: will this update?
     }
 
     private static class QuestionAdapter extends BaseAdapter {

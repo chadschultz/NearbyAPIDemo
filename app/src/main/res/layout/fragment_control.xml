@@ -31,6 +31,22 @@
         android:text="@string/intro_button"
         style="?android:attr/borderlessButtonStyle"/>
 
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
+        <EditText
+            android:id="@+id/update_distance_edittext"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal"/>
+        <Button
+            android:id="@+id/update_distance_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/update_distance_button"
+            style="?android:attr/borderlessButtonStyle"/>
+    </LinearLayout>
+
     <Button
         android:id="@+id/distance_button"
         android:layout_width="wrap_content"
