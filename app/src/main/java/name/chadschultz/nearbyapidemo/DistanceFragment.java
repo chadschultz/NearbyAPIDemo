@@ -62,6 +62,8 @@ public class DistanceFragment extends Fragment {
     public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        distanceBetweenBeacons = getArguments().getDouble(KEY_DISTANCE_BETWEEN_BEACONS);
+
         progressBar = (ProgressBar) view.findViewById(R.id.progressBar);
         rawDistanceTextView = (TextView) view.findViewById(R.id.raw_distance_textview);
         calculatedDistanceTextView = (TextView) view.findViewById(R.id.calculated_distance_textview);
@@ -149,9 +151,9 @@ public class DistanceFragment extends Fragment {
 
         StringBuilder sb = new StringBuilder(getString(R.string.accuracy_question));
         sb.append(getString(R.string.accuracy_results_row, getString(R.string.very_accurate), veryAccurateCount, veryAccuratePercentage * 100));
-        sb.append(getString(R.string.accuracy_results_row, getString(R.string.very_accurate), somewhatAccurateCount, somewhatAccuratePercentage * 100));
-        sb.append(getString(R.string.accuracy_results_row, getString(R.string.very_accurate), somewhatInaccurateCount, somewhatInaccuratePercentage * 100));
-        sb.append(getString(R.string.accuracy_results_row, getString(R.string.very_accurate), veryInaccurateCount, veryInaccuratePercentage * 100));
+        sb.append(getString(R.string.accuracy_results_row, getString(R.string.somewhat_accurate), somewhatAccurateCount, somewhatAccuratePercentage * 100));
+        sb.append(getString(R.string.accuracy_results_row, getString(R.string.somewhat_inaccurate), somewhatInaccurateCount, somewhatInaccuratePercentage * 100));
+        sb.append(getString(R.string.accuracy_results_row, getString(R.string.very_inaccurate), veryInaccurateCount, veryInaccuratePercentage * 100));
         accuracyResultsTextView.setText(sb.toString());
     }
 
@@ -202,6 +204,7 @@ public class DistanceFragment extends Fragment {
      * @return
      */
     static boolean isValidTriangle(double sideA, double sideB, double sideC) {
+        Log.d(TAG, "isValidTriangle(" + sideA + ", " + sideB + ", " + sideC);
         return (sideA + sideB > sideC &&
                 sideB + sideC > sideA &&
                 sideC + sideA > sideB);

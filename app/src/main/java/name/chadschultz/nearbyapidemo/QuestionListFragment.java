@@ -11,6 +11,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
 import android.widget.AdapterView.OnItemLongClickListener;
 import android.widget.BaseAdapter;
 import android.widget.ListView;
@@ -18,6 +19,8 @@ import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static name.chadschultz.nearbyapidemo.R.id.listview;
 
 
 public class QuestionListFragment extends Fragment {
@@ -48,7 +51,13 @@ public class QuestionListFragment extends Fragment {
     public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        listView = (ListView) view.findViewById(R.id.listview);
+        listView = (ListView) view.findViewById(listview);
+        listView.setOnItemClickListener(new OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                //Do nothing
+            }
+        });
         listView.setOnItemLongClickListener(new OnItemLongClickListener() {
             @Override
             public boolean onItemLongClick(AdapterView<?> adapterView, View view, final int position, long id) {
@@ -65,14 +74,13 @@ public class QuestionListFragment extends Fragment {
                 return false;
             }
         });
+
         adapter = new QuestionAdapter(getActivity(), new ArrayList<Question>());
         listView.setAdapter(adapter);
     }
 
     public void setQuestions(List<Question> questions) {
         adapter.setQuestions(questions);
-        listView.setAdapter(adapter);
-        //TODO: will this update?
     }
 
     private static class QuestionAdapter extends BaseAdapter {
@@ -120,9 +128,10 @@ public class QuestionListFragment extends Fragment {
         }
 
         void setQuestions(List<Question> questions) {
-            questions.clear();
+            this.questions.clear();
             this.questions.addAll(questions);
-            notifyDataSetChanged();
+//            notifyDataSetChanged();
+            notifyDataSetInvalidated();
         }
 
         private static class QuestionViewHolder {

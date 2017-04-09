@@ -6,12 +6,16 @@ import android.support.annotation.Nullable;
 import android.support.design.widget.TextInputLayout;
 import android.support.v4.app.DialogFragment;
 import android.text.TextUtils;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
+import android.widget.TextView.OnEditorActionListener;
 
 
 public class AskQuestionDialogFragment extends DialogFragment {
@@ -63,6 +67,18 @@ public class AskQuestionDialogFragment extends DialogFragment {
         questionTextInputLayout = (TextInputLayout) view.findViewById(R.id.question_textinputlayout);
         questionEditText = (EditText) view.findViewById(R.id.question_edittext);
         questionEditText.setText(question);
+        questionEditText.setOnEditorActionListener(new OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView textView, int actionId, KeyEvent keyEvent) {
+                if (actionId == EditorInfo.IME_ACTION_GO
+                        || (actionId == EditorInfo.IME_ACTION_DONE)
+                        || (keyEvent != null && keyEvent.getAction() == KeyEvent.ACTION_DOWN && keyEvent.getKeyCode() == KeyEvent.KEYCODE_ENTER)) {
+                    publishQuestion();
+                    return true;
+                }
+                return false;
+            }
+        });
         unpublishButton = (Button) view.findViewById(R.id.unpublish_button);
         unpublishButton.setOnClickListener(new OnClickListener() {
             @Override
@@ -78,13 +94,20 @@ public class AskQuestionDialogFragment extends DialogFragment {
             }
         });
 
-        updateButtons(question);
+        updateButtons();
 
         return view;
     }
 
-    private void updateButtons(String question) {
-        if (TextUtils.isEmpty(question)) {
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString(KEY_NAME, nameEditText.getText().toString());
+        outState.putString(KEY_QUESTION, questionEditText.getText().toString());
+    }
+
+    private void updateButtons() {
+        if (TextUtils.isEmpty(questionEditText.getText().toString())) {
             unpublishButton.setVisibility(View.GONE);
             publishButton.setText(R.string.publish_button);
         } else {
@@ -94,6 +117,8 @@ public class AskQuestionDialogFragment extends DialogFragment {
     }
 
     public void unpublishQuestion() {
+        questionEditText.setText(null);
+        updateButtons();
         questionListener.onUnpublishQuestion();
     }
 
@@ -102,8 +127,9 @@ public class AskQuestionDialogFragment extends DialogFragment {
         question = questionEditText.getText().toString();
         if (!TextUtils.isEmpty(question)) {
             questionListener.onPublishQuestion(name, question);
-            updateButtons(question);
+            updateButtons();
         }
+        dismiss();
     }
 }
 

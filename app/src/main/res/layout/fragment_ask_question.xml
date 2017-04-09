@@ -8,6 +8,7 @@
         android:id="@+id/instructions_textview"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
         android:text="@string/ask_question_instructions"/>
 
     <android.support.design.widget.TextInputLayout
@@ -19,7 +20,11 @@
             android:id="@+id/name_edittext"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="@string/name_label"/>
+            android:hint="@string/name_label"
+            android:maxLines="1"
+            android:inputType="text"
+            android:imeOptions="actionNext"
+            android:nextFocusForward="@+id/question_edittext"/>
     </android.support.design.widget.TextInputLayout>
 
     <android.support.design.widget.TextInputLayout
@@ -32,7 +37,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:lines="3"
-            android:hint="@string/question_label"/>
+            android:minLines="3"
+            android:hint="@string/question_label"
+            android:inputType="textMultiLine"
+            android:imeOptions="actionGo"/>
     </android.support.design.widget.TextInputLayout>
 
     <Button

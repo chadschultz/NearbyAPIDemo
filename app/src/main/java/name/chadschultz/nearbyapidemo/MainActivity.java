@@ -37,8 +37,10 @@ import com.google.android.gms.nearby.messages.BleSignal;
 import com.google.android.gms.nearby.messages.Distance;
 import com.google.android.gms.nearby.messages.Message;
 import com.google.android.gms.nearby.messages.MessageListener;
+import com.google.android.gms.nearby.messages.PublishCallback;
 import com.google.android.gms.nearby.messages.PublishOptions;
 import com.google.android.gms.nearby.messages.Strategy;
+import com.google.android.gms.nearby.messages.SubscribeCallback;
 import com.google.android.gms.nearby.messages.SubscribeOptions;
 
 import org.json.JSONException;
@@ -107,11 +109,13 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
     String uniqueID = UUID.randomUUID().toString();
     int veryAccurateCount, somewhatAccurateCount, somewhatInaccurateCount, veryInaccurateCount;
     //Beacons must be physically located exactly this far apart
-    double distanceBetweenBeacons = 4.0; //default to 4m / 10 feet
+    double distanceBetweenBeacons = 3.0; //default to 3m / 10 feet
     List<String> connectedEndpointIds; //Only used by host
     Question currentQuestion;
 
     //TODO: can I use more than one Google client at the same time? Can I use one client for multiple APIs?
+    //TODO: do I need a separate client for Connections?
+    private GoogleApiClient connectionsGoogleApiClient;
     private GoogleApiClient googleApiClient;
     private Message connectionMessage;
     private Message currentScreenMessage;
@@ -131,16 +135,11 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
         @Override
         public void onConnected(@Nullable Bundle bundle) {
             Log.i(TAG, "onConnected()");
-
-            showMessage("onConnected()");
-
             subscribe();
         }
 
         @Override
         public void onConnectionSuspended(int i) {
-            showMessage("onConnectionSuspended(" + i + ")");
-
             Log.w(TAG, "onConnectionSuspended(" + i +")");
         }
     };
@@ -154,8 +153,6 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
         public void onFound(Message message) {
 
             Log.d(TAG, "onFound(" + new String(message.getContent()));
-            showMessage("Received: " + new String(message.getContent()));
-
             //Don't worry about reading beacon messages here--we're only interested in onDistanceChanged
 
             //TODO: remove?
@@ -276,7 +273,7 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
                 questions.add(question);
                 filterQuestions();
                 if (getCurrentFragment() instanceof QuestionListFragment) {
-                    QuestionListFragment questionListFragment = QuestionListFragment.newInstance();
+                    QuestionListFragment questionListFragment = (QuestionListFragment) getCurrentFragment();
                     questionListFragment.setQuestions(questions);
                 }
             }
@@ -322,9 +319,12 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
                     }
                 }
                 questions.remove(question);
+                if (presenterMode) {
+                    questionTextView.setText(getString(R.string.answer_questions_button, questions.size()));
+                }
                 //TODO: ensure removing via unpublish works
                 if (getCurrentFragment() instanceof QuestionListFragment) {
-                    QuestionListFragment questionListFragment = QuestionListFragment.newInstance();
+                    QuestionListFragment questionListFragment = (QuestionListFragment) getCurrentFragment();
                     questionListFragment.setQuestions(questions);
                 }
             }
@@ -383,8 +383,13 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
             @Override
             public void onClick(View view) {
                 if (presenterMode) {
-                    QuestionListFragment questionListFragment = QuestionListFragment.newInstance();
-                    replaceFragment(questionListFragment);
+                    QuestionListFragment questionListFragment;
+                    if (getCurrentFragment() instanceof QuestionListFragment) {
+                        questionListFragment = (QuestionListFragment) getCurrentFragment();
+                    } else {
+                        questionListFragment = QuestionListFragment.newInstance();
+                        replaceFragmentAndAddToBackStack(questionListFragment);
+                    }
                     questionListFragment.setQuestions(questions);
                 } else {
                     AskQuestionDialogFragment askQuestionDialogFragment = AskQuestionDialogFragment.newInstance(currentQuestion);
@@ -421,13 +426,43 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
                 .addApi(Nearby.MESSAGES_API)
                 .addConnectionCallbacks(connectionCallbacks)
                 .enableAutoManage(this, connectionFailedListener)
-                .addApi(Nearby.CONNECTIONS_API)
+//                .addApi(Nearby.CONNECTIONS_API)
                 .addApi(Auth.GOOGLE_SIGN_IN_API, gso)
+                .build();
+
+        connectionsGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addConnectionCallbacks(new ConnectionCallbacks() {
+                    @Override
+                    public void onConnected(@Nullable Bundle bundle) {
+                        Log.i(TAG, "connectionsGoogleApiClient onConnected");
+                    }
+
+                    @Override
+                    public void onConnectionSuspended(int i) {
+                        Log.i(TAG, "connectionsGoogleApiClient onConnectionSuspended");
+                    }
+                })
+                .addOnConnectionFailedListener(new OnConnectionFailedListener() {
+                    @Override
+                    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+                        Log.e(TAG, "connectionsGoogleApiClient onConnectionFailed: " + connectionResult);
+                    }
+                })
+                .addApi(Nearby.CONNECTIONS_API)
                 .build();
 
         // Best practice when using Nearby, or at least Nearby Connections. See
         // https://developers.google.com/nearby/connections/android/manage-connections
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        //TODO: should this be with the other connection initialization?
+        Log.d(TAG, "connecting to connectionsGoogleApiClient");
+        connectionsGoogleApiClient.connect();
     }
 
     @Override
@@ -438,6 +473,11 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
 
         //TODO: temp see if this crashes, maybe move to onDestroy?
         disconnectFromDevices();
+
+        if (connectionsGoogleApiClient != null) {
+            Log.d(TAG, "disconnecting from connectionsGoogleApiClient");
+            connectionsGoogleApiClient.disconnect();
+        }
 
         super.onStop();
     }
@@ -500,6 +540,16 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
         }
     }
 
+    private void replaceFragmentAndAddToBackStack(Fragment fragment) {
+        //Combine with other method, reduce duplication
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, fragment, fragment.getClass().getName())
+                .addToBackStack(null)
+                .commit();
+        //TODO: is this line still necessary?
+        getSupportFragmentManager().executePendingTransactions();
+    }
+
     private void replaceFragment(Fragment fragment) {
         getSupportFragmentManager().beginTransaction()
                 .replace(R.id.fragment_container, fragment, fragment.getClass().getName())
@@ -540,15 +590,24 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
         if (googleApiClient != null) {
 
             //TODO: investigate MessageFilter?
-            Strategy strategy = new Strategy.Builder().setDistanceType(DISTANCE_TYPE_EARSHOT).build();
-            SubscribeOptions subscribeOptions = new SubscribeOptions.Builder().setStrategy(strategy).build();
+//            Strategy strategy = new Strategy.Builder().setDistanceType(DISTANCE_TYPE_EARSHOT).build();
+            Strategy strategy = new Strategy.Builder().setTtlSeconds(Strategy.TTL_SECONDS_INFINITE).build();
+            SubscribeOptions subscribeOptions = new SubscribeOptions.Builder()
+                    .setStrategy(strategy)
+                    .setCallback(new SubscribeCallback() {
+                @Override
+                public void onExpired() {
+                    Log.e(TAG, "Nearby subscription expired!");
+                }
+            }).build();
+//            SubscribeOptions subscribeOptions = new SubscribeOptions.Builder().setStrategy(strategy).build();
 
-//            Nearby.Messages.subscribe(googleApiClient, mMessageListener, mSubscribeOptions);
-            PendingResult<Status> status = Nearby.Messages.subscribe(googleApiClient, mMessageListener);
+            PendingResult<Status> status = Nearby.Messages.subscribe(googleApiClient, mMessageListener, subscribeOptions);
+//            PendingResult<Status> status = Nearby.Messages.subscribe(googleApiClient, mMessageListener);
             status.setResultCallback(new ResultCallback<Status>() {
                 @Override
                 public void onResult(@NonNull Status status) {
-                    showMessage("subscribe result: " + status);
+                    Log.i(TAG, "subscribe result: " + status);
                 }
             });
         }
@@ -589,7 +648,20 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
         }
 
         currentScreenMessage = new Message(jsonObject.toString().getBytes());
-        Nearby.Messages.publish(googleApiClient, currentScreenMessage);
+        Log.i(TAG, "Publishing: " + jsonObject.toString());
+        PublishOptions publishOptions = new PublishOptions.Builder().setCallback(new PublishCallback() {
+            @Override
+            public void onExpired() {
+                Log.w(TAG, "change current screen message: " + new String(currentScreenMessage.getContent()) + "has expired");
+            }
+        }).build();
+        PendingResult<Status> result = Nearby.Messages.publish(googleApiClient, currentScreenMessage);
+        result.setResultCallback(new ResultCallback<Status>() {
+            @Override
+            public void onResult(@NonNull Status status) {
+                Log.i(TAG, "changeCurrentScreen result status: " + status);
+            }
+        });
     }
 
     private void voteDistancePoll(String pollResponse) {
@@ -678,27 +750,29 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
         // The advertising timeout is set to run indefinitely
         // Positive values represent timeout in milliseconds
         long NO_TIMEOUT = 0L;
+        long ADVERTISE_TIMEOUT = 1000L * 60;
 
         //When you pass in null for the name parameter, the API constructs a default name based on the device model (for example, “LGE Nexus 5”)
-        String name = null;
         //TODO: temp
-        Log.e(TAG, "about to start advertising!");
-        //What the heck?? NO callbacks are happening now?
-        Nearby.Connections.startAdvertising(googleApiClient, name, appMetadata, NO_TIMEOUT,
+//        String name = null;
+        String name = uniqueID;
+        changeCurrentScreen(MESSAGE_SCREEN_CAMERA);
+        //TODO: temp
+        //Should the AppMetadata parameter be null, since it is deprecated anyway?
+        Log.i(TAG, "Nearby.Connections.startAdvertising(" + connectionsGoogleApiClient + ", " + name + ", " + appMetadata + ", " + NO_TIMEOUT + ", " + connectionRequestListener);
+        Nearby.Connections.startAdvertising(connectionsGoogleApiClient, name, appMetadata, NO_TIMEOUT,
+//                Nearby.Connections.startAdvertising(googleApiClient, name, null, NO_TIMEOUT,
                 connectionRequestListener).setResultCallback(new ResultCallback<Connections.StartAdvertisingResult>() {
             @Override
-            public void onResult(Connections.StartAdvertisingResult result) {
+            public void onResult(@NonNull Connections.StartAdvertisingResult result) {
                 if (result.getStatus().isSuccess()) {
                     // Device is advertising
                     Log.i(TAG, "Successfully advertising");
-                    showMessage("Successfully advertising");
-                    changeCurrentScreen(MESSAGE_SCREEN_CAMERA);
                     advertising = true;
                 } else {
                     int statusCode = result.getStatus().getStatusCode();
                     // Advertising failed - see statusCode for more details
                     Log.e(TAG, "advertising failed with status code " + statusCode);
-                    showMessage("advertising failed with status code " + statusCode);
                     advertising = false;
                 }
             }
@@ -722,16 +796,19 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
      * Only call this method after checking to ensure we are connected to Wi-Fi
      */
     private void startDiscovery() {
+        //TODO: should I be using this in more than one place?
         String serviceId = getString(R.string.service_id);
 
         // Set an appropriate timeout length in milliseconds
-        long DISCOVER_TIMEOUT = 1000L;
+        long DISCOVER_TIMEOUT = 1000L * 30;
 
+        Log.d(TAG, "Nearby.Connections.startDiscovery(" + connectionsGoogleApiClient + ", " + serviceId + ", " + DISCOVER_TIMEOUT + ", " + endpointDiscoveryListener);
         // Discover nearby apps that are advertising with the required service ID.
-        Nearby.Connections.startDiscovery(googleApiClient, serviceId, DISCOVER_TIMEOUT, endpointDiscoveryListener)
+        Nearby.Connections.startDiscovery(connectionsGoogleApiClient, serviceId, DISCOVER_TIMEOUT, endpointDiscoveryListener)
                 .setResultCallback(new ResultCallback<Status>() {
                     @Override
                     public void onResult(Status status) {
+                        Log.d(TAG, "startDiscovery resultCallback status is " + status);
                         if (status.isSuccess()) {
                             // Device is discovering
                             Log.d(TAG, "Connections is successfully discovering");
@@ -747,6 +824,7 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
 
         @Override
         public void onMessageReceived(String remoteEndpointId, byte[] payload, boolean isReliable) {
+            Log.d(TAG, "connectionsMessageListener onMessageReceived(" + remoteEndpointId + ", payload, " + isReliable);
             //TODO: make more efficient
             if (getCurrentFragment() instanceof CameraFragment) {
                 CameraFragment cameraFragment = (CameraFragment) getCurrentFragment();
@@ -761,11 +839,15 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
     };
 
     private void connectTo(String remoteEndpointId, final String remoteEndpointName) {
+        Log.d(TAG, "connectTo(" + remoteEndpointId + ", " + remoteEndpointName);
         // Send a connection request to a remote endpoint. By passing 'null' for
         // the name, the Nearby Connections API will construct a default name
         // based on device model such as 'LGE Nexus 5'.
-        String myName = null;
-        byte[] myPayload = null;
+//        String myName = null;
+        String myName = uniqueID;
+//        byte[] myPayload = null;
+        byte[] myPayload = new byte[0];
+        //TODO: temp what's up with those NPEs?
         Nearby.Connections.sendConnectionRequest(googleApiClient, myName,
                 remoteEndpointId, myPayload, new Connections.ConnectionResponseCallback() {
                     @Override
@@ -859,7 +941,7 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
             throw new RuntimeException(e);
         }
 
-        showMessage("Publishing: " + jsonObject.toString());
+        Log.d(TAG, "Publishing: " + jsonObject.toString());
 
         connectionMessage = new Message(jsonObject.toString().getBytes());
 //        PublishCallback publishCallback = new PublishCallback() {
@@ -899,7 +981,7 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
             throw new RuntimeException(e);
         }
 
-        showMessage("Publishing: " + jsonObject.toString());
+        Log.d(TAG, "Publishing: " + jsonObject.toString());
 
         connectionMessage = new Message(jsonObject.toString().getBytes());
 //        PublishCallback publishCallback = new PublishCallback() {
@@ -1008,6 +1090,7 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
     @Override
     public void onStartCamera() {
         //TODO - start streaming data
+        startDiscovery();
     }
 
     /* QuestionListener Methods */
@@ -1022,7 +1105,7 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
     @Override
     public void onPublishQuestion(String name, String question) {
         if (questionMessage != null) {
-            Nearby.Messages.unpublish(googleApiClient, settingMessage);
+            Nearby.Messages.unpublish(googleApiClient, questionMessage);
         }
 
         JSONObject jsonObject = new JSONObject();
@@ -1035,9 +1118,14 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
         }
 
         questionMessage = new Message(jsonObject.toString().getBytes());
-        //TODO: why is host not receiving??
-        showMessage("Sending: " + new String(questionMessage.getContent()));
-        Nearby.Messages.publish(googleApiClient, questionMessage);
+        Log.d(TAG, "Sending: " + new String(questionMessage.getContent()));
+        PublishOptions publishOptions = new PublishOptions.Builder().setCallback(new PublishCallback() {
+            @Override
+            public void onExpired() {
+                Log.w(TAG, "question message: " + new String(questionMessage.getContent()) + "has expired");
+            }
+        }).build();
+        Nearby.Messages.publish(googleApiClient, questionMessage, publishOptions);
 
         currentQuestion = new Question(name, question);
     }
