@@ -213,14 +213,18 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
                         replaceFragment(blankFragment);
                     }
                 } else if (MESSAGE_SCREEN_DISTANCE.equals(detail)) {
+                    DistanceFragment distanceFragment;
                     if (!(getCurrentFragment() instanceof DistanceFragment)) {
-                        DistanceFragment distanceFragment = DistanceFragment.newInstance(distanceBetweenBeacons);
+                        distanceFragment = DistanceFragment.newInstance(distanceBetweenBeacons);
                         replaceFragment(distanceFragment);
-
-                        if (leftBeaconDistance != null && rightBeaconDistance != null) {
-                            distanceFragment.updateDistances(leftBeaconDistance, rightBeaconDistance);
-                        }
+                    } else {
+                        distanceFragment = (DistanceFragment) getCurrentFragment();
                     }
+
+                    if (leftBeaconDistance != null && rightBeaconDistance != null) {
+                        distanceFragment.updateDistances(leftBeaconDistance, rightBeaconDistance);
+                    }
+                    updatePollResultsIfNeeded();
                 } else if (MESSAGE_SCREEN_POLL_RESULTS.equals(detail)) {
                     if (!(getCurrentFragment() instanceof DistanceFragment)) {
                         DistanceFragment distanceFragment = DistanceFragment.newInstance(distanceBetweenBeacons);
