@@ -10,6 +10,7 @@ import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 
 import java.util.Locale;
 
@@ -32,6 +33,7 @@ public class ControlFragment extends Fragment {
     private Button distanceButton;
     private Button pollResultsButton;
     private Button cameraButton;
+    private TextView connectedCountTextView;
     private Button contactInfoButton;
     private Button signOutButton;
 
@@ -123,6 +125,8 @@ public class ControlFragment extends Fragment {
                 onCameraButtonClicked();
             }
         });
+        connectedCountTextView = (TextView) view.findViewById(R.id.connected_count_textview);
+        updateConnectedCount(0);
         contactInfoButton = (Button) view.findViewById(R.id.contact_info_button);
         contactInfoButton.setOnClickListener(new OnClickListener() {
             @Override
@@ -218,6 +222,9 @@ public class ControlFragment extends Fragment {
         controlListener.onCamera();
     }
 
+    public void updateConnectedCount(int count) {
+        connectedCountTextView.setText(getString(R.string.connected_count, count));
+    }
 
 }
 

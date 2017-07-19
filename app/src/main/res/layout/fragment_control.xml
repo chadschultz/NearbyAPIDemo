@@ -68,6 +68,11 @@
         android:text="@string/camera_button"
         style="?android:attr/borderlessButtonStyle"/>
 
+    <TextView
+        android:id="@+id/connected_count_textview"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
     <Button
         android:id="@+id/contact_info_button"
         android:layout_width="wrap_content"

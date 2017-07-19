@@ -1,14 +1,22 @@
 package name.chadschultz.nearbyapidemo;
 
+import android.Manifest.permission;
+import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.media.AudioManager;
 import android.os.Bundle;
+import android.os.ParcelFileDescriptor;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.annotation.StringRes;
+import android.support.annotation.UiThread;
+import android.support.annotation.WorkerThread;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
-import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.View.OnLongClickListener;
@@ -28,11 +36,18 @@ import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Status;
 import com.google.android.gms.nearby.Nearby;
-import com.google.android.gms.nearby.connection.AppIdentifier;
-import com.google.android.gms.nearby.connection.AppMetadata;
-import com.google.android.gms.nearby.connection.Connections;
-import com.google.android.gms.nearby.connection.Connections.ConnectionRequestListener;
-import com.google.android.gms.nearby.connection.Connections.EndpointDiscoveryListener;
+import com.google.android.gms.nearby.connection.AdvertisingOptions;
+import com.google.android.gms.nearby.connection.ConnectionInfo;
+import com.google.android.gms.nearby.connection.ConnectionLifecycleCallback;
+import com.google.android.gms.nearby.connection.ConnectionResolution;
+import com.google.android.gms.nearby.connection.Connections.StartAdvertisingResult;
+import com.google.android.gms.nearby.connection.ConnectionsStatusCodes;
+import com.google.android.gms.nearby.connection.DiscoveredEndpointInfo;
+import com.google.android.gms.nearby.connection.DiscoveryOptions;
+import com.google.android.gms.nearby.connection.EndpointDiscoveryCallback;
+import com.google.android.gms.nearby.connection.Payload;
+import com.google.android.gms.nearby.connection.PayloadCallback;
+import com.google.android.gms.nearby.connection.PayloadTransferUpdate;
 import com.google.android.gms.nearby.messages.BleSignal;
 import com.google.android.gms.nearby.messages.Distance;
 import com.google.android.gms.nearby.messages.Message;
@@ -46,17 +61,27 @@ import com.google.android.gms.nearby.messages.SubscribeOptions;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 import static com.google.android.gms.nearby.messages.Strategy.DISTANCE_TYPE_EARSHOT;
 
-//TODO: add a way for the presenter to change the distance between the beacons?
+//TODO: WARNING: problems with Nearby Connections. The walkie-talkie sample app works fine,
+//but for me nodes sometimes disconnect for no reason, discovery doesn't always work, and audio recording
+//doesn't always work. Use Nexus 5 to send, not Nexus 6P.
 
 public class MainActivity extends AppCompatActivity implements AccuracyPollListener, ControlListener, CameraListener, QuestionListener, AnswerQuestionListener {
 
     public static final String TAG = "NearbyAPIDemo";
+
+    private static final int PERMISSIONS_REQUEST_COARSE_LOCATION = 1;
+    private static final int PERMISSIONS_REQUEST_RECORD_AUDIO = 2;
+
+    private static final String ADVERTISER_NAME = "presenter";
+    private static final String SERVICE_ID = BuildConfig.APPLICATION_ID;
+    private static final com.google.android.gms.nearby.connection.Strategy CONNECTIONS_STRATEGY = com.google.android.gms.nearby.connection.Strategy.P2P_STAR;
 
     private static final int RC_SIGN_IN = 1;
 
@@ -100,7 +125,7 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
     private List<Question> questions;
     private List<Question> answeredQuestions;
 
-    boolean advertising;
+    boolean advertising, discovering;
 
     //TODO: persist this data?
     boolean presenterMode;
@@ -237,6 +262,12 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
                     if (!(getCurrentFragment() instanceof CameraFragment)) {
                         CameraFragment cameraFragment = CameraFragment.newInstance();
                         replaceFragment(cameraFragment);
+                        // Set the media volume to max.
+                        setVolumeControlStream(AudioManager.STREAM_MUSIC);
+                        AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+                        mOriginalVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+                        audioManager.setStreamVolume(
+                                AudioManager.STREAM_MUSIC, audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC), 0);
                     }
                 } else if (MESSAGE_SCREEN_CONTACT_INFO.equals(detail)) {
                     if (!(getCurrentFragment() instanceof ContactInfoFragment)) {
@@ -370,8 +401,6 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
             Log.d(TAG, "onBleSignalChanged(" + new String(message.getContent()) + ", " + bleSignal);
         }
     };
-    private SubscribeOptions mSubscribeOptions = new SubscribeOptions.Builder().build();
-    private PublishOptions mPublishOptions;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -430,7 +459,6 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
                 .addApi(Nearby.MESSAGES_API)
                 .addConnectionCallbacks(connectionCallbacks)
                 .enableAutoManage(this, connectionFailedListener)
-//                .addApi(Nearby.CONNECTIONS_API)
                 .addApi(Auth.GOOGLE_SIGN_IN_API, gso)
                 .build();
 
@@ -458,6 +486,9 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
         // Best practice when using Nearby, or at least Nearby Connections. See
         // https://developers.google.com/nearby/connections/android/manage-connections
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        ActivityCompat.requestPermissions(this, new String[]{permission.ACCESS_COARSE_LOCATION},
+                PERMISSIONS_REQUEST_COARSE_LOCATION);
     }
 
     @Override
@@ -478,12 +509,27 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
         //TODO: temp see if this crashes, maybe move to onDestroy?
         disconnectFromDevices();
 
-        if (connectionsGoogleApiClient != null) {
-            Log.d(TAG, "disconnecting from connectionsGoogleApiClient");
-            connectionsGoogleApiClient.disconnect();
+        // Restore the original volume.
+        if (!presenterMode) {
+            AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, mOriginalVolume, 0);
+            setVolumeControlStream(AudioManager.USE_DEFAULT_STREAM_TYPE);
+        }
+
+        // Stop all audio-related threads
+        if (isRecording()) {
+            stopRecording();
+        }
+        if (isPlaying()) {
+            stopPlaying();
         }
 
         super.onStop();
+
+        if (connectionsGoogleApiClient != null && connectionsGoogleApiClient.isConnected()) {
+            Log.d(TAG, "disconnecting from connectionsGoogleApiClient");
+            connectionsGoogleApiClient.disconnect();
+        }
     }
 
     @Override
@@ -507,6 +553,8 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
                 if (getString(R.string.presenter_email).equalsIgnoreCase(acct.getEmail())) {
                     showMessage(R.string.user_valid);
                     setupUi(true);
+                    ActivityCompat.requestPermissions(this, new String[]{permission.RECORD_AUDIO},
+                            PERMISSIONS_REQUEST_RECORD_AUDIO);
                 } else {
                     showMessage(R.string.user_invalid);
                     onSignOut();
@@ -535,13 +583,6 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
 
     private Fragment getCurrentFragment() {
         return getSupportFragmentManager().findFragmentById(R.id.fragment_container);
-    }
-
-    private void showConnectFragment() {
-        Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
-        if (!(currentFragment instanceof ConnectFragment)) {
-            replaceFragment(ConnectFragment.newInstance());
-        }
     }
 
     private void replaceFragmentAndAddToBackStack(Fragment fragment) {
@@ -635,7 +676,7 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
 
     private void changeCurrentScreen(String newScreen) {
         // Leaving camera screen
-        if (advertising && !newScreen.equals(MESSAGE_SCREEN_CAMERA)) {
+        if ((discovering || advertising) && !newScreen.equals(MESSAGE_SCREEN_CAMERA)) {
             disconnectFromDevices();
         }
 
@@ -696,182 +737,214 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
         }
     }
 
-    Connections.MessageListener hostConnectionsMessageListener = new Connections.MessageListener() {
+    private void startAdvertising() {
+        Nearby.Connections.startAdvertising(
+                connectionsGoogleApiClient,
+                ADVERTISER_NAME,
+                SERVICE_ID,
+                connectionLifecycleCallback,
+                new AdvertisingOptions(com.google.android.gms.nearby.connection.Strategy.P2P_STAR))
+            .setResultCallback(
+                    new ResultCallback<StartAdvertisingResult>() {
+                        @Override
+                        public void onResult(@NonNull StartAdvertisingResult result) {
+                            if (result.getStatus().isSuccess()) {
+                                // Device is advertising
+                                Log.i(TAG, "Successfully advertising");
+                                advertising = true;
+                            } else {
+                                int statusCode = result.getStatus().getStatusCode();
+                                // Advertising failed - see statusCode for more details
+                                Log.e(TAG, "advertising failed with status code " + statusCode + " and status message " + result.getStatus().getStatusMessage());
+                                advertising = false;
+                            }
+                        }
+            });
+    }
+
+    private void stopAdvertising() {
+        Nearby.Connections.stopAdvertising(connectionsGoogleApiClient);
+        advertising = false;
+        Log.i(TAG, "Stopped advertising");
+    }
+
+    // We're using the same callback for advertiser and discoverer. Both are treated identically and must approve,
+    // even though the discoverer already made a request to connect. Go figure!
+    ConnectionLifecycleCallback connectionLifecycleCallback = new ConnectionLifecycleCallback() {
         @Override
-        public void onMessageReceived(String remoteEndpointId, byte[] payload, boolean isReliable) {
-            Log.e(TAG, "hostConnectionsMessageListener should not be receiving messages");
+        public void onConnectionInitiated(String endpointId, ConnectionInfo connectionInfo) {
+            // Automatically accept the connection on both sides.
+            // The alternative would be to use connectionInfo.getAuthenticationToken() to validate, most likely
+            // in a case where two people compare the devices side by side, showing the token on both
+            Nearby.Connections.acceptConnection(
+                    connectionsGoogleApiClient, endpointId, payloadCallback);
         }
 
         @Override
-        public void onDisconnected(String remoteEndpointId) {
-            Log.d(TAG, "hostConnectionsMessageListener.onDisconnected(" + remoteEndpointId + ")");
-        }
-    };
-
-    //Host receives this callback whenever a device wants to connect
-    private ConnectionRequestListener connectionRequestListener = new ConnectionRequestListener() {
-        @Override
-        public void onConnectionRequest(final String remoteEndpointId, final String remoteEndpointName, byte[] handshakeData) {
-            if (presenterMode) {
-                byte[] myPayload = null;
-                // Automatically accept all requests
-                Nearby.Connections.acceptConnectionRequest(googleApiClient, remoteEndpointId,
-                        myPayload, hostConnectionsMessageListener).setResultCallback(new ResultCallback<Status>() {
-                    @Override
-                    public void onResult(Status status) {
-                        if (status.isSuccess()) {
-                            Log.d(TAG, "Connected to endpoint: " + remoteEndpointId + " " + remoteEndpointName);
-                            connectedEndpointIds.add(remoteEndpointId);
-                        } else {
-                            Log.w(TAG, "Failed to connect to endpoint: " + remoteEndpointId + " " + remoteEndpointName);
+        public void onConnectionResult(String endpointId, ConnectionResolution result) {
+            switch (result.getStatus().getStatusCode()) {
+                case ConnectionsStatusCodes.STATUS_OK:
+                    // We're connected! Can now start sending and receiving data.
+                    Log.d(TAG, "Connected to endpoint " + endpointId);
+                    //TODO: will this prevent one side from auto-disconnecting?
+                    if (!presenterMode) {
+                        stopDiscovery();
+                        if (getCurrentFragment() instanceof CameraFragment) {
+                            ((CameraFragment)getCurrentFragment()).discoveredConnected();
                         }
                     }
-                });
-            } else {
-                // Clients should not be advertising and will reject all connection requests.
-                Nearby.Connections.rejectConnectionRequest(googleApiClient, remoteEndpointId);
-                Log.e(TAG, "Audience devices should not receive connection requests");
+
+                    //TODO: temp
+                    if (presenterMode) {
+                        connectedEndpointIds.add(endpointId);
+                        updateConnectedCount(connectedEndpointIds.size());
+//                        byte[] message = "Hello from Presenter".getBytes(Charset.forName("UTF-8"));
+//                        Nearby.Connections.sendPayload(connectionsGoogleApiClient, endpointId, Payload.fromBytes(message));
+                    }
+                    break;
+                case ConnectionsStatusCodes.STATUS_CONNECTION_REJECTED:
+                    // The connection was rejected by one or both sides.
+                    Log.d(TAG, "Could not connect to endpoint " + endpointId);
+                    if (!presenterMode) {
+                        if (getCurrentFragment() instanceof CameraFragment) {
+                            ((CameraFragment)getCurrentFragment()).discoveringFailed();
+                        }
+                    }
+                    break;
             }
         }
-    };
 
-    private void startAdvertising() {
-        //TODO: move network check to Fragment?
-        if (!NetworkUtil.isConnectedToNetwork(this)) {
-            new AlertDialog.Builder(this)
-                    .setMessage(R.string.error_no_connection)
-                    .show();
-            return;
-        }
-
-        // Advertising with an AppIdentifer lets other devices on the
-        // network discover this application and prompt the user to
-        // install the application.
-        List<AppIdentifier> appIdentifierList = new ArrayList<>();
-        appIdentifierList.add(new AppIdentifier(getPackageName()));
-        AppMetadata appMetadata = new AppMetadata(appIdentifierList);
-
-        // The advertising timeout is set to run indefinitely
-        // Positive values represent timeout in milliseconds
-        long NO_TIMEOUT = 0L;
-        long ADVERTISE_TIMEOUT = 1000L * 60;
-
-        //When you pass in null for the name parameter, the API constructs a default name based on the device model (for example, “LGE Nexus 5”)
-        //TODO: temp
-//        String name = null;
-        String name = uniqueID;
-        changeCurrentScreen(MESSAGE_SCREEN_CAMERA);
-        //TODO: temp
-        //Should the AppMetadata parameter be null, since it is deprecated anyway?
-        Log.i(TAG, "Nearby.Connections.startAdvertising(" + connectionsGoogleApiClient + ", " + name + ", " + appMetadata + ", " + NO_TIMEOUT + ", " + connectionRequestListener);
-        Nearby.Connections.startAdvertising(connectionsGoogleApiClient, name, appMetadata, NO_TIMEOUT,
-//                Nearby.Connections.startAdvertising(googleApiClient, name, null, NO_TIMEOUT,
-                connectionRequestListener).setResultCallback(new ResultCallback<Connections.StartAdvertisingResult>() {
-            @Override
-            public void onResult(@NonNull Connections.StartAdvertisingResult result) {
-                if (result.getStatus().isSuccess()) {
-                    // Device is advertising
-                    Log.i(TAG, "Successfully advertising");
-                    advertising = true;
-                } else {
-                    int statusCode = result.getStatus().getStatusCode();
-                    // Advertising failed - see statusCode for more details
-                    Log.e(TAG, "advertising failed with status code " + statusCode);
-                    advertising = false;
+        @Override
+        public void onDisconnected(String endpointId) {
+            // We've been disconnected from this endpoint. No more data can be
+            // sent or received.
+            connectedEndpointIds.remove(endpointId);
+            updateConnectedCount(connectedEndpointIds.size());
+            if (!presenterMode) {
+                if (getCurrentFragment() instanceof CameraFragment) {
+                    ((CameraFragment)getCurrentFragment()).discoveringFailed();
                 }
             }
-        });
-    }
-
-    EndpointDiscoveryListener endpointDiscoveryListener = new EndpointDiscoveryListener() {
-        @Override
-        public void onEndpointFound(String endpointId, String serviceId, String name) {
-            Log.d(TAG, "onEndpointFound(" + endpointId + ", " + serviceId + ", " + name + ")");
-            connectTo(endpointId, name);
-        }
-
-        @Override
-        public void onEndpointLost(String endpointId) {
-            Log.d(TAG, "onEndpointLost(" + endpointId + ")");
+            Log.d(TAG, "Disconnected from endpoint " + endpointId);
         }
     };
 
-    /**
-     * Only call this method after checking to ensure we are connected to Wi-Fi
-     */
-    private void startDiscovery() {
-        //TODO: should I be using this in more than one place?
-        String serviceId = getString(R.string.service_id);
-
-        // Set an appropriate timeout length in milliseconds
-        long DISCOVER_TIMEOUT = 1000L * 30;
-
-        Log.d(TAG, "Nearby.Connections.startDiscovery(" + connectionsGoogleApiClient + ", " + serviceId + ", " + DISCOVER_TIMEOUT + ", " + endpointDiscoveryListener);
-        // Discover nearby apps that are advertising with the required service ID.
-        Nearby.Connections.startDiscovery(connectionsGoogleApiClient, serviceId, DISCOVER_TIMEOUT, endpointDiscoveryListener)
-                .setResultCallback(new ResultCallback<Status>() {
-                    @Override
-                    public void onResult(Status status) {
-                        Log.d(TAG, "startDiscovery resultCallback status is " + status);
-                        if (status.isSuccess()) {
-                            // Device is discovering
-                            Log.d(TAG, "Connections is successfully discovering");
-                        } else {
-                            int statusCode = status.getStatusCode();
-                            Log.w(TAG, "Connections Discovery failed with statusCode of " + statusCode);
-                        }
-                    }
-                });
+    private void updateConnectedCount(int count) {
+        if (getCurrentFragment() instanceof ControlFragment) {
+            ((ControlFragment) getCurrentFragment()).updateConnectedCount(count);
+        }
     }
 
-    Connections.MessageListener connectionsMessageListener = new Connections.MessageListener() {
-
+    PayloadCallback payloadCallback = new PayloadCallback() {
         @Override
-        public void onMessageReceived(String remoteEndpointId, byte[] payload, boolean isReliable) {
-            Log.d(TAG, "connectionsMessageListener onMessageReceived(" + remoteEndpointId + ", payload, " + isReliable);
-            //TODO: make more efficient
-            if (getCurrentFragment() instanceof CameraFragment) {
-                CameraFragment cameraFragment = (CameraFragment) getCurrentFragment();
-                cameraFragment.updateCameraImage(payload);
+        public void onPayloadReceived(String endpointId, Payload payload) {
+            Log.d(TAG, String.format("onPayloadReceived(endpointId=%s, payload=%s)", endpointId, payload));
+//            String message = new String(payload.asBytes(), Charset.forName("UTF-8"));
+//            Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
+            if (payload.getType() == Payload.Type.STREAM) {
+                if (mAudioPlayer != null) {
+                    mAudioPlayer.stop();
+                    mAudioPlayer = null;
+                }
+
+                AudioPlayer player =
+                        new AudioPlayer(payload.asStream().asInputStream()) {
+                            @WorkerThread
+                            @Override
+                            protected void onFinish() {
+                                runOnUiThread(
+                                        new Runnable() {
+                                            @UiThread
+                                            @Override
+                                            public void run() {
+                                                mAudioPlayer = null;
+                                            }
+                                        });
+                            }
+                        };
+                mAudioPlayer = player;
+                player.start();
             }
         }
 
         @Override
-        public void onDisconnected(String remoteEndpointId) {
-            Log.d(TAG, "connectionsMessageListener onDisconnected(" + remoteEndpointId + ")");
+        public void onPayloadTransferUpdate(String endpointId, PayloadTransferUpdate update) {
+            Log.d(TAG, String.format(
+                    "onPayloadTransferUpdate(endpointId=%s, update=%s)", endpointId, update));
         }
     };
 
-    private void connectTo(String remoteEndpointId, final String remoteEndpointName) {
-        Log.d(TAG, "connectTo(" + remoteEndpointId + ", " + remoteEndpointName);
-        // Send a connection request to a remote endpoint. By passing 'null' for
-        // the name, the Nearby Connections API will construct a default name
-        // based on device model such as 'LGE Nexus 5'.
-//        String myName = null;
-        String myName = uniqueID;
-//        byte[] myPayload = null;
-        byte[] myPayload = new byte[0];
-        //TODO: temp what's up with those NPEs?
-        Nearby.Connections.sendConnectionRequest(googleApiClient, myName,
-                remoteEndpointId, myPayload, new Connections.ConnectionResponseCallback() {
-                    @Override
-                    public void onConnectionResponse(String remoteEndpointId, Status status,
-                                                     byte[] bytes) {
-                        if (status.isSuccess()) {
-                            Log.i(TAG, "Nearby Connections successfully connected");
-                        } else {
-                            Log.w(TAG, "Nearby Connections connection failed with status code of " + status.getStatusCode());
+    private final EndpointDiscoveryCallback endpointDiscoveryCallback = new EndpointDiscoveryCallback() {
+        @Override
+        public void onEndpointFound(String endpointId, DiscoveredEndpointInfo discoveredEndpointInfo) {
+            Log.d(TAG, "endpoint " + endpointId + " found");
+            // Here we're automatically trying to connect to anyone who wants to connect with us. The docs suggest
+            // "Depending on your use case, you may wish to instead display a list of discovered devices to the user,
+            // allowing them to choose which devices to connect to."
+            Nearby.Connections.requestConnection(
+                    connectionsGoogleApiClient,
+                    ADVERTISER_NAME,
+                    endpointId,
+                    connectionLifecycleCallback)
+                .setResultCallback(
+                        new ResultCallback<Status>() {
+                            @Override
+                            public void onResult(@NonNull Status status) {
+                                if (status.isSuccess()) {
+                                    // We successfully requested a connection. Now both sides
+                                    // must accept before the connection is established.
+                                } else {
+                                    // Nearby Connections failed to request the connection.
+                                }
+                            }
+                        }
+                );
+        }
+
+        @Override
+        public void onEndpointLost(String endPointId) {
+            Log.d(TAG, "endpoint " + endPointId + " lost");
+        }
+    };
+
+    private void startDiscovery() {
+        Nearby.Connections.startDiscovery(
+                connectionsGoogleApiClient,
+                BuildConfig.APPLICATION_ID,
+                endpointDiscoveryCallback,
+                new DiscoveryOptions(CONNECTIONS_STRATEGY))
+            .setResultCallback(
+                    new ResultCallback<Status>() {
+                        @Override
+                        public void onResult(@NonNull Status status) {
+                            if (status.isSuccess()) {
+                                Log.i(TAG, "Successfully discovering");
+                                discovering = true;
+                            } else {
+                                int statusCode = status.getStatusCode();
+                                Log.i(TAG, "discovering failed with status code " + statusCode + " and status message: " + status.getStatusMessage());
+                                discovering = false;
+                            }
                         }
                     }
-                }, connectionsMessageListener);
+            );
+    }
+
+    private void stopDiscovery() {
+        Nearby.Connections.stopDiscovery(connectionsGoogleApiClient);
+        discovering = false;
+        Log.i(TAG, "Stopped discovery");
     }
 
     private void disconnectFromDevices() {
         connectedEndpointIds = new ArrayList<>();
         if (advertising) {
-            Nearby.Connections.stopAdvertising(googleApiClient);
-            advertising = false;
+            stopAdvertising();
         }
+        if (discovering) {
+            stopDiscovery();
+        }
+        //TODO: do I need this?
         if (connectedEndpointIds.size() > 0) {
             Nearby.Connections.stopAllEndpoints(googleApiClient);
         }
@@ -1068,6 +1141,9 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
 
     @Override
     public void onCamera() {
+//        ActivityCompat.requestPermissions(this, new String[]{permission.RECORD_AUDIO},
+//                PERMISSIONS_REQUEST_RECORD_AUDIO);
+        changeCurrentScreen(MESSAGE_SCREEN_CAMERA);
         startAdvertising();
     }
 
@@ -1094,6 +1170,7 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
     @Override
     public void onStartCamera() {
         //TODO - start streaming data
+        Log.d(TAG, "onStartCamera()");
         startDiscovery();
     }
 
@@ -1143,4 +1220,130 @@ public class MainActivity extends AppCompatActivity implements AccuracyPollListe
         QuestionListFragment questionListFragment = (QuestionListFragment) getCurrentFragment();
         questionListFragment.setQuestions(questions);
     }
+
+
+
+    /** Listens to holding/releasing the volume rocker. */
+    private final GestureDetector gestureDetector =
+            new GestureDetector(KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_VOLUME_UP) {
+                @Override
+                protected void onHold() {
+                    Log.d(TAG, "onHold");
+                    if (connectedEndpointIds.size() > 0) {
+                        startRecording();
+                    }
+                }
+
+                @Override
+                protected void onRelease() {
+                    Log.d(TAG, "onRelease");
+                    stopRecording();
+                }
+            };
+
+    /** For recording audio as the user speaks. */
+    @Nullable private AudioRecorder mRecorder;
+
+    /** For playing audio from other users nearby. */
+    @Nullable private AudioPlayer mAudioPlayer;
+
+    /** The phone's original media volume. */
+    private int mOriginalVolume;
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (presenterMode && gestureDetector.onKeyEvent(event)) {
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    /** Stops all currently streaming audio tracks. */
+    private void stopPlaying() {
+        Log.v(TAG, "stopPlaying()");
+        if (mAudioPlayer != null) {
+            mAudioPlayer.stop();
+            mAudioPlayer = null;
+        }
+    }
+
+    /** @return True if currently playing. */
+    private boolean isPlaying() {
+        return mAudioPlayer != null;
+    }
+
+    /** Starts recording sound from the microphone and streaming it to all connected devices. */
+    private void startRecording() {
+        Log.v(TAG, "startRecording()");
+        try {
+            ParcelFileDescriptor[] payloadPipe = ParcelFileDescriptor.createPipe();
+
+            // Send the first half of the payload (the read side) to Nearby Connections.
+            send(Payload.fromStream(payloadPipe[0]));
+
+            // Use the second half of the payload (the write side) in AudioRecorder.
+            mRecorder = new AudioRecorder(payloadPipe[1]);
+            mRecorder.start();
+        } catch (IOException e) {
+            Log.e(TAG, "startRecording() failed", e);
+            Toast.makeText(this, "recording failed!", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void send(Payload payload) {
+        Nearby.Connections.sendPayload(connectionsGoogleApiClient, new ArrayList<>(connectedEndpointIds), payload)
+                .setResultCallback(
+                        new ResultCallback<Status>() {
+                            @Override
+                            public void onResult(@NonNull Status status) {
+                                if (!status.isSuccess()) {
+                                    Log.w(TAG, "Couldn't send payload. Status code: " + status.getStatusCode() + " Status message: " + status.getStatusMessage());
+                                }
+                            }
+                        });
+    }
+
+    /** Stops streaming sound from the microphone. */
+    private void stopRecording() {
+        Log.v(TAG, "stopRecording()");
+        if (mRecorder != null) {
+            mRecorder.stop();
+            mRecorder = null;
+        }
+    }
+
+    /** @return True if currently streaming from the microphone. */
+    private boolean isRecording() {
+        return mRecorder != null && mRecorder.isRecording();
+    }
+
+    public void permissionGranted() {
+        Log.d(TAG, "audio recording permission granted");
+    }
+
+    public void permissionNotGranted() {
+        Log.d(TAG, "audio recording permission NOT granted");
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
+        if (requestCode == PERMISSIONS_REQUEST_RECORD_AUDIO) {
+            // If request is cancelled, the result arrays are empty.
+            if (grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                permissionGranted();
+            } else {
+                permissionNotGranted();
+            }
+        } else if (requestCode == PERMISSIONS_REQUEST_COARSE_LOCATION) {
+            // If request is cancelled, the result arrays are empty.
+            if (grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.i(TAG, "coarse location permission granted");
+            } else {
+                Log.i(TAG, "coarse location permission granted");
+            }
+        }
+    }
+
 }

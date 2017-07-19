@@ -30,8 +30,6 @@
     <string name="accuracy_results">Accuracy poll results:</string>
     <string name="accuracy_results_row">\n%1$s: %2$d (%3$.2f%%)</string>
 
-    <string name="error_no_connection">Wi-Fi connection required</string>
-
     <string name="contact">Thank you for your attention!\n\nChad Schultz\nchad@spothero.com\nhttps://github.com/chadschultz\nhttps://twitter.com/thechadschultz</string>
 
     <string name="ask_question_instructions">Publish your question below. Only the presenter will see it. Several times during the presentation, the presenter will answer questions. There may not be time for all questions. If you provide a name, the presenter may use it when answering your question.</string>
@@ -55,6 +53,12 @@
     <string name="distance_button">Distance</string>
     <string name="distance_poll_button">Distance Poll Results</string>
     <string name="camera_button">Camera</string>
+    <string name="connected_count">Connected endpoints: %1$d</string>
     <string name="contact_info_button">Contact Info</string>
     <string name="sign_out_button">Sign Out</string>
+
+    <string name="discovering">Discovering…</string>
+    <string name="discovering_failed">Discovering failed</string>
+    <string name="discovered_connected">Connected</string>
+    <string name="discovered_disconnected">Disconnected</string>
 </resources>

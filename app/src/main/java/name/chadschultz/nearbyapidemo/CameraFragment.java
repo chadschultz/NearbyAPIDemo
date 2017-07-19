@@ -11,8 +11,13 @@ import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-
+//TODO: I had originally planned to stream images from the camera over Nearby Connections
+//due to lack of time, tried to adapt the walkie-talkie sample app for audio instead
 public class CameraFragment extends Fragment {
+
+    private static final String TAG = CameraFragment.class.getSimpleName();
+
+    public static final int PERMISSIONS_REQUEST_COARSE_LOCATION = 3;
 
     CameraListener cameraListener;
 
@@ -44,11 +49,10 @@ public class CameraFragment extends Fragment {
         cameraImageView = (ImageView) view.findViewById(R.id.camera_imageview);
         errorTextView = (TextView) view.findViewById(R.id.error_textview);
 
-        if (NetworkUtil.isConnectedToNetwork(getActivity())) {
-            cameraListener.onStartCamera();
-        } else {
-            noConnection();
-        }
+        cameraListener.onStartCamera();
+
+        errorTextView.setText(R.string.discovering);
+        errorTextView.setVisibility(View.VISIBLE);
     }
 
     public void noConnection() {
@@ -65,6 +69,21 @@ public class CameraFragment extends Fragment {
 
     public void updateCameraImage(byte[] payload) {
         //TODO: how does this work? Need to update with each frame.
+    }
+
+    public void discoveredConnected() {
+        errorTextView.setText(R.string.discovered_connected);
+        progressBar.setVisibility(View.INVISIBLE);
+    }
+
+    public void discoveringFailed() {
+        errorTextView.setText(R.string.discovering_failed);
+        progressBar.setVisibility(View.INVISIBLE);
+    }
+
+    public void discoveringDisconnected() {
+        errorTextView.setText(R.string.discovered_disconnected);
+        progressBar.setVisibility(View.INVISIBLE);
     }
 }
 
